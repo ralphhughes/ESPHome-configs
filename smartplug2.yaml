@@ -1,0 +1,145 @@
+esphome:
+  name: smartplug2
+  comment: 2Nice UP111 with power monitoring
+  platform: ESP8266
+  board: esp01_1m
+
+
+wifi:
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi_ssid2
+    password: !secret wifi_password2
+  domain: .lan
+
+  
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Smartplug2 Fallback Hotspot"
+    password: "9JZsodS6RBrH"
+
+captive_portal:
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+time:
+  - platform: homeassistant
+
+substitutions:
+# Unique ID for Sensors.
+  switch_id: "plug_02"
+  
+binary_sensor:
+  # Push Button
+  - platform: gpio
+    id: ${switch_id}_in_switch1
+    internal: true
+    pin: GPIO3
+    name: " Switch 1"
+    filters:
+      - invert:
+    on_click:
+      min_length: 50ms
+      max_length: 350ms
+      then:
+        - switch.toggle: ${switch_id}_out_relay1
+  # Template Sensor - Tracks Relay, Switches LED to Match (Internal Only)
+  - platform: template
+    name: "${switch_id} Template 1"
+    id: ${switch_id}_template1
+    internal: true
+    lambda: |-
+      if (id(${switch_id}_out_relay1).state) {
+        return true;
+      } else {
+        return false;
+      }
+    on_state:
+      - if:
+          condition:
+            - binary_sensor.is_on: ${switch_id}_template1
+          then:
+            - switch.turn_on: ${switch_id}_out_led
+            - switch.turn_off: ${switch_id}_out_led_red
+      - if:
+          condition:
+            - binary_sensor.is_off: ${switch_id}_template1
+          then:
+            - switch.turn_off: ${switch_id}_out_led  
+            - switch.turn_on: ${switch_id}_out_led_red
+
+switch:
+  # Restart Switch in HA
+  - platform: restart
+    name: "${switch_id} Restart"
+  # Relay Output
+  - platform: gpio
+    pin: GPIO14
+    id: ${switch_id}_out_relay1
+    name: "${switch_id} Relay"
+  # Blue LED Output
+  - platform: gpio
+    pin: GPIO1
+    internal: true
+    id: ${switch_id}_out_led
+    inverted: yes
+    name: "${switch_id} Touch Status Led"  
+  - platform: gpio
+    id: ${switch_id}_out_led_red
+    name: "${switch_id} Touch Status Led Red"
+    pin: GPIO13
+    inverted: True
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+sensor:
+  - platform: hlw8012
+    sel_pin:
+      number: GPIO12
+      inverted: True
+    cf_pin: GPIO04
+    cf1_pin: GPIO05
+    # Calibration
+    current_resistor: 0.0025 # Value of shunt resistor in ohms (higher value gives lower watt readout)
+    voltage_divider: 880 # Resistance ratio of internal voltage divider resistors (lower value gives lower voltage readout)
+    current:
+      name: "${switch_id} Current"
+      unit_of_measurement: A
+      id: "energy_temp_Amperage"
+    voltage:
+      name: "${switch_id} Voltage"
+      unit_of_measurement: V
+      id: "energy_temp_Voltage"
+      filters:
+        # Map from sensor -> measured value
+        - calibrate_linear:
+            - 0.0 -> 0.0
+            - 222.4 -> 244
+
+    power:
+      name: "${switch_id} Power"
+      unit_of_measurement: W
+      id: "energy_temp_Wattage"
+    change_mode_every: 8
+    update_interval: 30s
+  - platform: total_daily_energy
+    name: "${switch_id} Total Daily Energy"
+    power_id: "energy_temp_Wattage"
+    filters:
+        # Multiplication factor from W to kW is 0.001
+        - multiply: 0.001
+    unit_of_measurement: kWh
+#  - platform: template
+#    name: "${switch_id} Apparent Power"
+#    unit_of_measurement: VA
+#    lambda: return id(energy_temp_Voltage).state * id(energy_temp_Amperage).state;
+#  - platform: template
+#    name: "${switch_id} Power Factor"
+#    lambda: return id(energy_temp_Wattage).state / (id(energy_temp_Voltage).state * id(energy_temp_Amperage).state);

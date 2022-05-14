@@ -1,0 +1,66 @@
+esphome:
+  name: esp-dd6bdc
+  platform: ESP8266
+  board: d1_mini
+  comment: Summer house solar panel monitor
+
+wifi:
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi_ssid2
+    password: !secret wifi_password2
+  domain: .lan
+  ap: {} # This spawns an AP with the device name and mac address with no password.
+
+captive_portal:
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+
+i2c:
+  sda: D2
+  scl: D1
+  scan: True
+
+sensor:
+  - platform: ina219
+    address: 0x40
+    shunt_resistance: 0.1 ohm
+    current:
+      name: "Shed Solar Current"
+    power:
+      name: "Shed Solar Power"
+      id: my_power
+    bus_voltage:
+      name: "Shed Battery Voltage"
+    shunt_voltage:
+      name: "INA219 Shunt Voltage"
+      disabled_by_default: true
+    max_voltage: 16.0V
+    max_current: 3.2A
+    update_interval: 60s
+
+  - platform: total_daily_energy
+    name: "Shed Solar Total Daily Energy"
+    power_id: my_power
+
+  - platform: dht
+    model: AM2302
+    pin: D6
+    temperature:
+      name: "Shed Temperature"
+    humidity:
+      name: "Shed Humidity"
+    update_interval: 60s
+  
