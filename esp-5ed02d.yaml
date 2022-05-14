@@ -1,0 +1,46 @@
+esphome:
+  name: esp_5ed02d
+  platform: ESP8266
+  board: d1_mini
+  comment: Kitchen
+  
+wifi:
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi_ssid2
+    password: !secret wifi_password2
+  domain: .lan
+  power_save_mode: HIGH
+  output_power: "12dB"
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap: {}
+
+captive_portal:
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+i2c:
+  scl: D1
+  sda: D2
+  scan: True
+  
+sensor:
+  - platform: htu21d
+    temperature:
+      name: "Kitchen Temperature"
+    humidity:
+      name: "Kitchen Humidity"
+    update_interval: 60s
+
+binary_sensor:
+  - platform: gpio
+    pin: D6
+    name: "Kitchen PIR"
+    device_class: motion

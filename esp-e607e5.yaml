@@ -1,0 +1,62 @@
+esphome:
+  name: esp-e607e5
+  platform: ESP8266
+  board: d1_mini
+  comment: Front bedroom
+  
+wifi:
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi_ssid2
+    password: !secret wifi_password2
+  domain: .lan
+  use_address: esp_e607e5
+  
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap: {}
+
+captive_portal:
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+
+i2c:
+  sda: D2
+  scl: D1
+  scan: True
+  
+sensor:
+  - platform: wifi_signal
+    name: "Front bedroom WiFi Signal"
+    update_interval: 60s
+  - platform: sht3xd
+    temperature:
+      name: "Front bedroom temperature"
+    humidity:
+      name: "Front bedroom humidity"
+    address: 0x45
+    update_interval: 60s
+  - platform: uptime
+    name: "Front bedroom uptime"
+    
+binary_sensor:
+  - platform: gpio
+    pin: GPIO0
+    name: "Front bedroom PIR"
+    device_class: motion
+    
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "Front bedroom IP Address"
+    ssid:
+      name: "Front bedroom Connected SSID"
+    bssid:
+      name: "Front bedroom Connected BSSID"
