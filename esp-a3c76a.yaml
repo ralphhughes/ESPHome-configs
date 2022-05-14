@@ -1,0 +1,170 @@
+esphome:
+  name: esp-a3c76a
+  comment: Heliostat-v0.2
+  platform: ESP8266
+  board: d1_mini
+
+wifi:
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi_ssid2
+    password: !secret wifi_password2
+  domain: .lan
+  ap: {} # This spawns an AP with the device name and mac address with no password.
+
+web_server:
+  port: 80
+  
+captive_portal:
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+##############################################
+
+# Generate these by using the "uncalibrated" control to move to positions, then use a compass (or
+# the sun itself with a shadow stick) to record the actual heading. Plot these on a graph and use
+# the linear regression trendline to show equation y = mx + c. Substitute the calculated m and c 
+# in here then re-flash the ESP. The "calibrated" control should now work.
+globals:
+  - id: azi_linear_reg_m
+    type: float
+    restore_value: no
+    initial_value: '-0.01226'
+  - id: azi_linear_reg_c
+    type: float
+    restore_value: no
+    initial_value: '2.3099'
+  - id: inc_linear_reg_m
+    type: float
+    restore_value: no
+    initial_value: '-0.01178'
+  - id: inc_linear_reg_c
+    type: float
+    restore_value: no
+    initial_value: '0.2233'    
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    on_time:
+      - seconds: 0
+        minutes: /1
+        then:
+          - logger.log:
+              format: 'isAutoMode: %d, isSunTracking: %d'
+              args: ['id(isAutoMode).current_values.is_on()', 'id(isSunTracking).current_values.is_on()']
+          - if:
+              condition:
+                and:
+                  - sun.is_above_horizon:
+                  - light.is_on: isAutoMode
+                  - light.is_on: isSunTracking
+              then:  
+                - logger.log:
+                    format: "Sun azimuth: %.1f, Azi_servo: %.3f"
+                    args: ['id(sunpos).azimuth()', '(id(sunpos).azimuth() * id(azi_linear_reg_m)) + id(azi_linear_reg_c)']
+                - servo.write:
+                    id: azi_servo
+                    level: !lambda 'return (id(sunpos).azimuth() * id(azi_linear_reg_m)) + id(azi_linear_reg_c);'
+                - logger.log:
+                    format: "Sun elevation: %.1f, Inc_servo: %.3f"
+                    args: ['id(sunpos).elevation()', '(id(sunpos).elevation() * id(inc_linear_reg_m)) + id(inc_linear_reg_c)']
+                - servo.write:
+                    id: inc_servo
+                    level: !lambda 'return (id(sunpos).elevation() * id(inc_linear_reg_m)) + id(inc_linear_reg_c);'
+
+sun:
+    id: sunpos
+    latitude: !secret my_latitude
+    longitude: !secret my_longitude
+
+# led's on D5 & D6, servos on D1 & D2
+light:
+  - platform: binary
+    name: "Mode: Off=Manual, On=Auto"
+    id: "isAutoMode"
+    output: led5_output
+  - platform: binary
+    name: "Mode type: Off=Safe-Park, On=Sun-Tracking"
+    id: "isSunTracking"
+    output: led6_output
+
+output:
+  - id: led5_output
+    platform: gpio
+    pin:
+      number: D5
+      inverted: true
+  - id: led6_output
+    platform: gpio
+    pin:
+      number: D6
+      inverted: true
+  - platform: esp8266_pwm
+    id: pwm_output1
+    pin: D1
+    frequency: 50 Hz
+  - platform: esp8266_pwm
+    id: pwm_output2
+    pin: D2
+    frequency: 50 Hz
+
+
+servo:
+  - id: azi_servo
+    output: pwm_output1
+    auto_detach_time: 1s
+    transition_length: 3s
+  - id: inc_servo
+    output: pwm_output2
+    auto_detach_time: 1s
+    transition_length: 3s
+
+
+number:
+  - platform: template
+    name: Azimuth Servo - Uncalibrated
+    min_value: -1
+    max_value: 1
+    step: 0.01
+    set_action:
+      then:
+        - servo.write:
+            id: azi_servo
+            level: !lambda 'return x;'
+  - platform: template
+    name: Azimuth Servo - Calibrated
+    min_value: 105
+    max_value: 270
+    step: 5
+    set_action:
+      then:
+        - servo.write:
+            id: azi_servo
+            level: !lambda 'return id(azi_linear_reg_m) * x + id(azi_linear_reg_c);'
+  - platform: template
+    name: Inclination Servo - Uncalibrated
+    min_value: -1
+    max_value: 1
+    step: 0.01
+    set_action:
+      then:
+        - servo.write:
+            id: inc_servo
+            level: !lambda 'return x;'            
+  - platform: template
+    name: Inclination Servo - Calibrated
+    min_value: 0
+    max_value: 90
+    step: 1
+    set_action:
+      then:
+        - servo.write:
+            id: inc_servo
+            level: !lambda 'return id(inc_linear_reg_m) * x + id(inc_linear_reg_c);'
