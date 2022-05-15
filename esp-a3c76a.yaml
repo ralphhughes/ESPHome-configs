@@ -26,6 +26,8 @@ api:
 
 ota:
 ##############################################
+# Config
+##############################################
 
 # Generate these by using the "uncalibrated" control to move to positions, then use a compass (or
 # the sun itself with a shadow stick) to record the actual heading. Plot these on a graph and use
@@ -47,87 +49,64 @@ globals:
   - id: inc_linear_reg_c
     type: float
     restore_value: no
-    initial_value: '0.2233'    
+    initial_value: '0.2233'  
+# Define the safe park location. This position should minimise wind loading on the mirror    
+  - id: safe_park_azimuth
+    type: float
+    restore_value: no
+    initial_value: '180'
+  - id: safe_park_inclination
+    type: float
+    restore_value: no
+    initial_value: '0'
+##############################################
 
 time:
+#  - platform: sntp
   - platform: homeassistant
-    id: homeassistant_time
-    on_time:
-      - seconds: 0
-        minutes: /1
-        then:
-          - logger.log:
-              format: 'isAutoMode: %d, isSunTracking: %d'
-              args: ['id(isAutoMode).current_values.is_on()', 'id(isSunTracking).current_values.is_on()']
-          - if:
-              condition:
-                and:
-                  - sun.is_above_horizon:
-                  - light.is_on: isAutoMode
-                  - light.is_on: isSunTracking
-              then:  
-                - logger.log:
-                    format: "Sun azimuth: %.1f, Azi_servo: %.3f"
-                    args: ['id(sunpos).azimuth()', '(id(sunpos).azimuth() * id(azi_linear_reg_m)) + id(azi_linear_reg_c)']
-                - servo.write:
-                    id: azi_servo
-                    level: !lambda 'return (id(sunpos).azimuth() * id(azi_linear_reg_m)) + id(azi_linear_reg_c);'
-                - logger.log:
-                    format: "Sun elevation: %.1f, Inc_servo: %.3f"
-                    args: ['id(sunpos).elevation()', '(id(sunpos).elevation() * id(inc_linear_reg_m)) + id(inc_linear_reg_c)']
-                - servo.write:
-                    id: inc_servo
-                    level: !lambda 'return (id(sunpos).elevation() * id(inc_linear_reg_m)) + id(inc_linear_reg_c);'
+    on_time_sync:
+      then:
+        - logger.log: "Synchronized system clock"
 
-sun:
-    id: sunpos
-    latitude: !secret my_latitude
-    longitude: !secret my_longitude
+button:
+  - platform: template
+    name: "Safe park"
+    id: "btn_safe_park"
+    on_press:
+      then:
+        - logger.log: Button Pressed
 
-# led's on D5 & D6, servos on D1 & D2
-light:
-  - platform: binary
-    name: "Mode: Off=Manual, On=Auto"
-    id: "isAutoMode"
-    output: led5_output
-  - platform: binary
-    name: "Mode type: Off=Safe-Park, On=Sun-Tracking"
-    id: "isSunTracking"
-    output: led6_output
-
-output:
-  - id: led5_output
-    platform: gpio
-    pin:
-      number: D5
-      inverted: true
-  - id: led6_output
-    platform: gpio
-    pin:
-      number: D6
-      inverted: true
-  - platform: esp8266_pwm
-    id: pwm_output1
-    pin: D1
-    frequency: 50 Hz
-  - platform: esp8266_pwm
-    id: pwm_output2
-    pin: D2
-    frequency: 50 Hz
-
-
-servo:
-  - id: azi_servo
-    output: pwm_output1
-    auto_detach_time: 1s
-    transition_length: 3s
-  - id: inc_servo
-    output: pwm_output2
-    auto_detach_time: 1s
-    transition_length: 3s
-
+select:
+  - platform: template
+    name: "test"
+    optimistic: true
+    options: 
+     - Happy
+     - Sad
+    on_value:
+      then:
+        - logger.log:
+            format: "Chosen option: %s"
+            args: ["x.c_str()"]
 
 number:
+  - platform: template
+    name: Target Azimuth
+    id: azi_target
+    min_value: 0
+    max_value: 360
+    step: 1
+    optimistic: true
+    restore_value: true
+  - platform: template
+    name: Target Inclination
+    id: inc_target
+    min_value: 0
+    max_value: 90
+    step: 1
+    optimistic: true
+    restore_value: true
+    
   - platform: template
     name: Azimuth Servo - Uncalibrated
     min_value: -1
@@ -143,6 +122,7 @@ number:
     min_value: 105
     max_value: 270
     step: 5
+    mode: box
     set_action:
       then:
         - servo.write:
@@ -163,8 +143,114 @@ number:
     min_value: 0
     max_value: 90
     step: 1
+    mode: box
     set_action:
       then:
         - servo.write:
             id: inc_servo
             level: !lambda 'return id(inc_linear_reg_m) * x + id(inc_linear_reg_c);'
+
+interval:
+  - interval: 30s
+    then:
+      - logger.log:
+          format: "isAutoMode: %d, isSunTracking: %d"
+          args: ['id(isAutoMode).current_values.is_on()', 'id(isSunTracking).current_values.is_on()']
+      - if:
+          condition:
+            and:
+              - sun.is_above_horizon:
+              - light.is_on: isAutoMode
+              - light.is_on: isSunTracking # Sun tracker mode
+          then:  
+            - logger.log:
+                format: "Target azimuth: %.1f, Sun azimuth: %.1f, Azi_servo: %.3f"
+                args: ['id(azi_target)', 'id(sunpos).azimuth()', '(id(sunpos).azimuth() * id(azi_linear_reg_m)) + id(azi_linear_reg_c)']
+            - servo.write:
+                id: azi_servo
+                level: !lambda 'return id(azi_linear_reg_c) + id(azi_linear_reg_m) * ((id(sunpos).azimuth() + id(azi_target).state) / 2);'
+            - logger.log:
+                format: "Target inclination: %.1f, Sun elevation: %.1f, Inc_servo: %.3f"
+                args: ['id(inc_target)', 'id(sunpos).elevation()', '(id(sunpos).elevation() * id(inc_linear_reg_m)) + id(inc_linear_reg_c)']
+            - servo.write:
+                id: inc_servo
+                level: !lambda 'return ((90-id(sunpos).elevation()) * id(inc_linear_reg_m)) + id(inc_linear_reg_c);'
+      - if:
+          condition:
+            and:
+              - sun.is_above_horizon:
+              - light.is_on: isAutoMode
+              - light.is_off: isSunTracking # Heliostat mode
+          then:  
+            - logger.log: "Safe park"
+            - servo.write:
+                id: azi_servo
+                level: !lambda 'return id(safe_park_azimuth) * id(azi_linear_reg_m) + id(azi_linear_reg_c);'
+            - servo.write:
+                id: inc_servo
+                level: !lambda 'return id(safe_park_inclination) * id(inc_linear_reg_m) + id(inc_linear_reg_c);'
+
+
+sun:
+    id: sunpos
+    latitude: !secret my_latitude
+    longitude: !secret my_longitude
+    on_sunrise:
+      - then:
+          - logger.log: Good morning!
+    on_sunset: # Go to safe park position even if in a different mode
+      - then:
+          - logger.log: Good night!
+          - servo.write:
+              id: azi_servo
+              level: !lambda 'return id(safe_park_azimuth) * id(azi_linear_reg_m) + id(azi_linear_reg_c);'
+          - servo.write:
+              id: inc_servo
+              level: !lambda 'return id(safe_park_inclination) * id(inc_linear_reg_m) + id(inc_linear_reg_c);'
+
+##############################################
+# Actual hardware config
+##############################################
+
+# LED's on D5 & D6
+light:
+  - platform: binary
+    name: "Mode: Off=Manual, On=Auto"
+    id: "isAutoMode"
+    output: led5_output
+
+  - platform: binary
+    name: "Mode_type: Off=Heliostat, On=Sun-Tracker"
+    id: "isSunTracking"
+    output: led6_output
+
+# Servos on D1 & D2
+servo:
+  - id: azi_servo
+    output: pwm_output1
+    auto_detach_time: 1s
+    transition_length: 3s
+  - id: inc_servo
+    output: pwm_output2
+    auto_detach_time: 1s
+    transition_length: 3s
+
+output:
+  - id: led5_output
+    platform: gpio
+    pin:
+      number: D5
+      inverted: true
+  - id: led6_output
+    platform: gpio
+    pin:
+      number: D6
+      inverted: true
+  - platform: esp8266_pwm
+    id: pwm_output1
+    pin: D1
+    frequency: 50 Hz
+  - platform: esp8266_pwm
+    id: pwm_output2
+    pin: D2
+    frequency: 50 Hz
