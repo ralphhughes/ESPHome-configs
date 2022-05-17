@@ -47,11 +47,11 @@ globals:
   - id: inc_linear_reg_slope
     type: float
     restore_value: no
-    initial_value: '-0.01178'
+    initial_value: '0.01426'
   - id: inc_linear_reg_intercept
     type: float
     restore_value: no
-    initial_value: '0.2233'  
+    initial_value: '-0.9918'  
 # Define the safe park location. This position should minimise wind loading on the mirror    
   - id: safe_park_azimuth
     type: float
@@ -60,7 +60,7 @@ globals:
   - id: safe_park_inclination
     type: float
     restore_value: no
-    initial_value: '0'
+    initial_value: '90'
 ##############################################
 
 sensor:
@@ -271,6 +271,16 @@ servo:
     transition_length: 3s
 
 output:
+  - id: led5_output
+    platform: gpio
+    pin:
+      number: D5
+      inverted: true
+  - id: led6_output
+    platform: gpio
+    pin:
+      number: D6
+      inverted: true
   - platform: esp8266_pwm
     id: pwm_output1
     pin: D1
