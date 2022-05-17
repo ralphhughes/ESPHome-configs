@@ -29,12 +29,19 @@ api:
 ota:
 ##############################################
 # Config
+#########
+# How to setup this device:
+# Step 1 - Put heliostat in approx position with pointer fitted. Turn device on, connect to WiFi, visit the device's web page
+# Step 2 - Click "Zero servo's". This will put the azimuth and inclination servo's to the mid-position (0.0 on the sliders). Point the device approximately south
+# Step 3 - Drag the "uncalibrated" sliders to a few different positions. Record the true compass heading & inclination for a handful of positions between -1.0 and 1.0
+# Step 4 - Use linear regression with the true headings\inclinations as 'x' and the server position as 'y' to calculate the m(slope) and intercept(c) in y=mc+c
+# Step 5 - Put the calculated m\slope and c\intercept values into the settings below. Re-flash the ESP and test that the "Calibrated" azimuth & inclination controls work.
+# Step 6 - Put the device into sun-tracker or heliostat mode depending on your use-case.
 ##############################################
 
-# Generate these by using the "uncalibrated" control to move to positions, then use a compass (or
-# the sun itself with a shadow stick) to record the actual heading. Plot these on a graph and use
-# the linear regression trendline to show equation y = mx + c. Substitute the calculated m and c 
-# in here then re-flash the ESP. The "calibrated" control should now work.
+
+
+
 globals:
   - id: azi_linear_reg_slope
     type: float
@@ -208,7 +215,7 @@ number:
 ################################
 
 interval:
-  - interval: 30s
+  - interval: 60s
     then:
       - logger.log: 
           format: "Mode: %s, Sun azimuth: %.1f, Sun elevation: %.1f"
@@ -250,7 +257,7 @@ interval:
                 level: !lambda 'return ( id(azi_linear_reg_slope) * (id(sunpos).azimuth() + id(azi_target).state / 2)) + id(azi_linear_reg_intercept);'
             - servo.write:
                 id: inc_servo
-                level: !lambda 'return ( ( id(sunpos).elevation() + id(inc_target).state / 2) * id(inc_linear_reg_slope) ) + id(inc_linear_reg_intercept);'
+                level: !lambda 'return ( id(inc_linear_reg_slope * (id(sunpos).elevation() + id(inc_target).state / 2) ) + id(inc_linear_reg_intercept);'
            
 
 
