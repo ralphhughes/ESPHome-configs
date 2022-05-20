@@ -29,13 +29,13 @@ api:
 ota:
 ##############################################
 # Config
-#########
+##############################################
 # How to setup this device:
-# Step 1 - Put heliostat in approx position with pointer fitted. Turn device on, connect to WiFi, visit the device's web page
-# Step 2 - Click "Zero servo's". This will put the azimuth and inclination servo's to the mid-position (0.0 on the sliders). Point the device approximately south
+# Step 1 - Put heliostat in approx position with pointer fitted. Turn device on, flash the ESP with your WiFi credentials & location, visit the device's web page
+# Step 2 - Click "Goto mid-point". This will put the azimuth and inclination servo's to the mid-position (0.0 on the sliders). Point the device approximately south
 # Step 3 - Drag the "uncalibrated" sliders to a few different positions. Record the true compass heading & inclination for a handful of positions between -1.0 and 1.0
-# Step 4 - Use linear regression with the true headings\inclinations as 'x' and the server position as 'y' to calculate the m(slope) and intercept(c) in y=mc+c
-# Step 5 - Put the calculated m\slope and c\intercept values into the settings below. Re-flash the ESP and test that the "Calibrated" azimuth & inclination controls work.
+# Step 4 - Use linear regression with the true headings\inclinations as 'x' and the servo position as 'y' to calculate the m(slope) and intercept(c) in y=mx+c
+# Step 5 - Put the calculated m(slope) and c(intercept) values into the settings below. Re-flash the ESP and test that the "Calibrated" azimuth & inclination controls work.
 # Step 6 - Put the device into sun-tracker or heliostat mode depending on your use-case.
 ##############################################
 
@@ -59,7 +59,7 @@ globals:
     type: float
     restore_value: no
     initial_value: '-0.9918'  
-# Define the safe park location. This position should minimise wind loading on the mirror    
+# Define the safe park location. This position should minimise wind loading on the mirror or solar panel    
   - id: safe_park_azimuth
     type: float
     restore_value: no
@@ -67,7 +67,7 @@ globals:
   - id: safe_park_inclination
     type: float
     restore_value: no
-    initial_value: '90'
+    initial_value: '90'   # Pointing straight up (mirror or solar panel horizontal)
 ##############################################
 
 sensor:
@@ -78,8 +78,8 @@ sensor:
     update_interval: 60s
 
 time:
-#  - platform: sntp
-  - platform: homeassistant
+#  - platform: homeassistant
+  - platform: sntp
     on_time_sync:
       then:
         - logger.log: "Synchronized system clock"
@@ -113,38 +113,50 @@ select:
 
 button:
   - platform: template
-    name: "Safe park"
+    name: "Goto safe park"
     id: "btn_safe_park"
     icon: mdi:icon7-minus-sign
     on_press:
       then:
         - logger.log: Going to safe park position
-        - servo.write:
-            id: azi_servo
-            level: !lambda 'return id(safe_park_azimuth) * id(azi_linear_reg_slope) + id(azi_linear_reg_intercept);'
-        - servo.write:
-            id: inc_servo
-            level: !lambda 'return id(safe_park_inclination) * id(inc_linear_reg_slope) + id(inc_linear_reg_intercept);'
         - select.set: # Change mode to 'Manual' otherwise we won't be in safe park position for long...
             id: mode_sel
             option: "Manual"
+        - number.set:
+            id: azi
+            value: !lambda 'return id(safe_park_azimuth);'
+        - servo.write:
+            id: azi_servo
+            level: !lambda 'return id(safe_park_azimuth) * id(azi_linear_reg_slope) + id(azi_linear_reg_intercept);'
+        - number.set:
+            id: inc
+            value: !lambda 'return id(safe_park_inclination);'
+        - servo.write:
+            id: inc_servo
+            level: !lambda 'return id(safe_park_inclination) * id(inc_linear_reg_slope) + id(inc_linear_reg_intercept);'
   - platform: template
-    name: "Zero Servo's"
+    name: "Goto mid-point (South)"
     id: "btn_servo_midpoint"
     icon: mdi:icon7-home
     on_press:
       then:
         - logger.log: Going to servo midpoint position
-        - servo.write:
-            id: azi_servo
-            level: 0.0
-        - servo.write:
-            id: inc_servo
-            level: 0.0
         - select.set: # Change mode to 'Manual' otherwise we won't be at midpoint position for long...
             id: mode_sel
             option: "Manual"
-
+        - number.set:
+            id: azi_raw
+            value: 0.0
+        - servo.write:
+            id: azi_servo
+            level: 0.0
+        - number.set:
+            id: inc_raw
+            value: 0.0            
+        - servo.write:
+            id: inc_servo
+            level: 0.0
+        
 
 number:
   - platform: template
@@ -165,7 +177,8 @@ number:
     restore_value: true
 
   - platform: template
-    name: Azimuth Servo - Uncalibrated
+    name: Uncalibrated Azimuth
+    id: azi_raw
     min_value: -1
     max_value: 1
     step: 0.01
@@ -176,18 +189,8 @@ number:
             id: azi_servo
             level: !lambda 'return x;'
   - platform: template
-    name: Azimuth Servo - Calibrated
-    min_value: 105
-    max_value: 270
-    step: 5
-    mode: box
-    set_action:
-      then:
-        - servo.write:
-            id: azi_servo
-            level: !lambda 'return id(azi_linear_reg_slope) * x + id(azi_linear_reg_intercept);'
-  - platform: template
-    name: Inclination Servo - Uncalibrated
+    name: Uncalibrated Inclination
+    id: inc_raw
     min_value: -1
     max_value: 1
     step: 0.01
@@ -197,14 +200,34 @@ number:
         - servo.write:
             id: inc_servo
             level: !lambda 'return x;'            
+
   - platform: template
-    name: Inclination Servo - Calibrated
+    name: Manual Azimuth
+    id: azi
+    min_value: 90
+    max_value: 270
+    step: 1
+    mode: box
+    set_action:
+      then:
+        - number.set:
+            id: azi_raw
+            value: !lambda 'return id(azi_linear_reg_slope) * x + id(azi_linear_reg_intercept);'
+        - servo.write:
+            id: azi_servo
+            level: !lambda 'return id(azi_linear_reg_slope) * x + id(azi_linear_reg_intercept);'
+  - platform: template
+    name: Manual Inclination
+    id: inc
     min_value: 0
     max_value: 90
     step: 1
     mode: box
     set_action:
       then:
+        - number.set:
+            id: inc_raw
+            value: !lambda 'return id(inc_linear_reg_slope) * x + id(inc_linear_reg_intercept);'
         - servo.write:
             id: inc_servo
             level: !lambda 'return id(inc_linear_reg_slope) * x + id(inc_linear_reg_intercept);'
@@ -254,10 +277,10 @@ interval:
           then:  
             - servo.write:
                 id: azi_servo
-                level: !lambda 'return ( id(azi_linear_reg_slope) * (id(sunpos).azimuth() + id(azi_target).state / 2)) + id(azi_linear_reg_intercept);'
+                level: !lambda 'return ( id(azi_linear_reg_slope) * (id(sunpos).azimuth() + id(azi_target).state / 2) ) + id(azi_linear_reg_intercept);'
             - servo.write:
                 id: inc_servo
-                level: !lambda 'return ( id(inc_linear_reg_slope * (id(sunpos).elevation() + id(inc_target).state / 2) ) + id(inc_linear_reg_intercept);'
+                level: !lambda 'return ( id(inc_linear_reg_slope) * (id(sunpos).elevation() + id(inc_target).state / 2) ) + id(inc_linear_reg_intercept);'
            
 
 
