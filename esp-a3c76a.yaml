@@ -156,7 +156,20 @@ button:
         - servo.write:
             id: inc_servo
             level: 0.0
-        
+
+# If user has used the manual controls to get the light on the target. This should calculate the azi_target & inc_target and set them:
+#  - platform: template
+#    name: "Target lock-on"
+#    id: "btn_target_lock"
+#    on_press:
+#      then:
+#        - logger.log: 
+#            format: "Sun azimuth: %.1f, Target azimuth: %.1f, Mirror azimuth: %.1f"
+#            args: ['id(sunpos).azimuth()', 'id(azi_target).state', '(id(sunpos).azimuth() + id(azi_target).state) / 2']
+#        - logger.log: 
+#            format: "Sun elevation: %.1f, Target elevation: %.1f, Mirror elevation: %.1f"
+#            args: ['id(sunpos).elevation()', 'id(inc_target).state', '(id(sunpos).elevation() + id(inc_target).state) / 2']
+         
 
 number:
   - platform: template
@@ -167,6 +180,7 @@ number:
     step: 1
     optimistic: true
     restore_value: true
+
   - platform: template
     name: Target Inclination
     id: inc_target
@@ -188,6 +202,7 @@ number:
         - servo.write:
             id: azi_servo
             level: !lambda 'return x;'
+
   - platform: template
     name: Uncalibrated Inclination
     id: inc_raw
@@ -216,6 +231,7 @@ number:
         - servo.write:
             id: azi_servo
             level: !lambda 'return id(azi_linear_reg_slope) * x + id(azi_linear_reg_intercept);'
+
   - platform: template
     name: Manual Inclination
     id: inc
@@ -277,10 +293,10 @@ interval:
           then:  
             - servo.write:
                 id: azi_servo
-                level: !lambda 'return ( id(azi_linear_reg_slope) * (id(sunpos).azimuth() + id(azi_target).state / 2) ) + id(azi_linear_reg_intercept);'
+                level: !lambda 'return ( id(azi_linear_reg_slope) * (id(sunpos).azimuth() + id(azi_target).state) / 2 ) + id(azi_linear_reg_intercept);'
             - servo.write:
                 id: inc_servo
-                level: !lambda 'return ( id(inc_linear_reg_slope) * (id(sunpos).elevation() + id(inc_target).state / 2) ) + id(inc_linear_reg_intercept);'
+                level: !lambda 'return ( id(inc_linear_reg_slope) * (id(sunpos).elevation() + id(inc_target).state) / 2 ) + id(inc_linear_reg_intercept);'
            
 
 
