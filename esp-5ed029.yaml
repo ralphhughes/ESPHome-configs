@@ -1,0 +1,130 @@
+esphome:
+  name: esp-5ed029
+  comment: Power monitor on house electricity meter
+  
+esp8266:
+  board: d1_mini
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  password: ""
+
+ota:
+  password: ""
+
+wifi:
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi_ssid2
+    password: !secret wifi_password2
+  domain: .lan
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap: {}
+    
+
+captive_portal:
+
+
+time:
+  - platform: homeassistant
+    on_time:
+      - seconds: 0
+        minutes: 0
+        hours: 0
+        then:
+          - pulse_meter.set_total_pulses:
+              id: power_meter
+              value: 0
+  
+  
+############## original pulse counter approach
+# sensor:
+  # - platform: pulse_counter
+    # name: 'Power Meter_old'
+    # id: 'power_meter_old'
+    # pin: GPIO15
+    # unit_of_measurement: 'kW'
+    # device_class: power
+    # state_class: "measurement"
+    # internal_filter: 10us # Maybe I'm getting extra pulses from somewhere? Try to filter them out, if they exist?
+    # count_mode:
+      # rising_edge: INCREMENT
+      # falling_edge: DISABLE
+    # filters:
+# #      - multiply: 0.01 # What I had it as previously by eyeballing home assistant and the IHD at the same time until it looked right
+# #      - multiply: 0.06 # What it theoretically should be (This number is calculated by dividing 60 with the imp/kWh of your power meter)
+# #      - multiply: 0.01452 # Change 17th Jan using previous 0.06000 and 16th Jan data: measured 28.886kWh, actual 6.990kWh
+      # - multiply: 0.015366 # Change 19th Jan using previous 0.01452 and 18th Jan data: measured  5.838kWh, actual 6.178kWh
+
+  # - platform: total_daily_energy
+    # name: "House Total Daily Energy_old"
+    # power_id: "power_meter_old"
+    # device_class: energy
+# #    filters:
+# #      - multiply: 0.001
+    # unit_of_measurement: kWh
+
+
+############## Pulse meter using same LDR
+sensor:
+  - platform: pulse_meter
+    pin: GPIO15
+    unit_of_measurement: 'kW'
+    name: 'Power Meter'
+    id: 'power_meter'
+    internal_filter: 100ms
+    accuracy_decimals: 3
+    filters:
+      - multiply: 0.06
+    total:
+      name: "House Total Daily Energy"
+      device_class: energy
+      unit_of_measurement: "kWh"
+      accuracy_decimals: 3
+      filters:
+        - multiply: 0.001
+
+
+
+
+
+###########  Current clamp with burden resistor giving sine wave on analogue pin
+  - platform: adc
+    pin: A0
+    id: adc_sensor
+    accuracy_decimals: 5 
+
+  - platform: ct_clamp
+    sensor: adc_sensor
+    id: ct_clamp1
+    name: "Power Meter(CT Clamp)"
+    update_interval: 30s
+    unit_of_measurement: 'kW'
+    device_class: power
+    state_class: "measurement"
+    accuracy_decimals: 5 
+    filters:
+    - calibrate_polynomial:
+       degree: 2
+       datapoints:    
+        - 0.000 -> 0.000
+        - 0.012 -> 0.020
+        - 0.012 -> 0.030
+        - 0.014 -> 0.140
+        - 0.041 -> 0.800
+        - 0.065 -> 1.320
+        - 0.196 -> 3.820
+        
+  - platform: total_daily_energy
+    name: "House Total Daily Energy(CT Clamp)"
+    power_id: "ct_clamp1"
+    device_class: energy
+#    filters:
+#      - multiply: 0.001
+    unit_of_measurement: kWh
+        

@@ -101,6 +101,7 @@ sensor:
       name: "${friendly_name} Power"
       id: socket_my_power
       unit_of_measurement: W
+      device_class: power
       filters:
           - calibrate_linear:
             - 0.0000 -> 0.5900 # Relay off no load
@@ -120,9 +121,10 @@ sensor:
     name: "${friendly_name} Total Energy"
     power_id: socket_my_power
     unit_of_measurement: kWh
+    device_class: energy
     accuracy_decimals: 3
     restore: true
-    min_save_interval: 180s
+    # min_save_interval: 180s
     filters:
       - multiply: 0.001
 

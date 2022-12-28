@@ -2,7 +2,7 @@ esphome:
   name: esp-3d3e68
   platform: ESP8266
   board: d1_mini
-  comment: Power monitor on house electricity meter
+  
 
 wifi:
   networks:
@@ -12,7 +12,7 @@ wifi:
     password: !secret wifi_password2
   domain: .lan
   power_save_mode: LIGHT
-  output_power: "10dB"
+  #output_power: "10dB"
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap: {}
 
@@ -29,25 +29,15 @@ ota:
 time:
   - platform: homeassistant
 
+
+
 sensor:
-  - platform: pulse_counter
-    name: 'Power Meter'
-    id: 'power_meter'
-    pin: GPIO15
-    unit_of_measurement: 'kW'
-    internal_filter: 10us # Maybe I'm getting extra pulses from somewhere? Try to filter them out, if they exist?
-#    count_mode:
-#      rising_edge: INCREMENT
-#      falling_edge: DISABLE
-#    internal_filter: 13us
-    filters:
-#      - multiply: 0.01 # What I had it as previously by eyeballing home assistant and the IHD at the same time until it looked right
-#      - multiply: 0.06 # What it theoretically should be (This number is calculated by dividing 60 with the imp/kWh of your power meter)
-#      - multiply: 0.01452 # Change 17th Jan using previous 0.06000 and 16th Jan data: measured 28.886kWh, actual 6.990kWh
-      - multiply: 0.015366 # Change 19th Jan using previous 0.01452 and 18th Jan data: measured  5.838kWh, actual 6.178kWh
-      # 22nd Jan measured 7.168, actual 7.26
-      
-  - platform: total_daily_energy
-    name: "House Total Daily Energy"
-    power_id: "power_meter"
-    unit_of_measurement: kWh
+  - platform: dht
+    pin: D5
+    model: DHT22_TYPE2 # Didn't work: AUTO_DETECT, DHT11, DHT22
+    temperature:
+      name: "Hall Temperature"
+    humidity:
+      name: "Hall Humidity"
+    update_interval: 60s
+

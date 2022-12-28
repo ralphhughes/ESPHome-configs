@@ -1,0 +1,73 @@
+esphome:
+  name: esp-3ca829
+  comment: Dining room
+  
+esp8266:
+  board: d1_mini
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  password: ""
+
+ota:
+  password: ""
+
+wifi:
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi_ssid2
+    password: !secret wifi_password2
+  domain: .lan
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap: {}
+  
+
+captive_portal:
+
+i2c:
+  scan: true
+  scl: D1
+  sda: D2
+
+dallas:
+  - pin: D5
+
+switch:
+  - platform: gpio
+    pin: D7     # See https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/ for which pins are good for input and output
+    name: "CombiRelay"
+
+sensor:
+  - platform: sht3xd 
+    temperature:
+      name: "Dining Room Temperature"
+    humidity:
+      name: "Dining Room Humidity"
+    address: 0x44
+    update_interval: 60s
+  
+  - platform: dallas
+    address: 0x6d02189245769e28
+    name: "Dining Room Temperature3"
+
+  - platform: dallas
+    address: 0x1a03069779ac0128
+    name: "Hot Water Temperature"
+    
+  - platform: dallas
+    address: 0x5601143276e2c128
+    name: "Outside Temperature"
+
+  - platform: dallas
+    address: 0xea0004441efaff28
+    name: "Radiator Flow Temperature"
+
+  - platform: dallas
+    address: 0xd90516931d7dff28
+    name: "Radiator Return Temperature"
+

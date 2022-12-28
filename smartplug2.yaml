@@ -127,6 +127,7 @@ sensor:
       name: "${switch_id} Power"
       unit_of_measurement: W
       id: "energy_temp_Wattage"
+      device_class: power
     change_mode_every: 8
     update_interval: 30s
   - platform: total_daily_energy
@@ -136,6 +137,7 @@ sensor:
         # Multiplication factor from W to kW is 0.001
         - multiply: 0.001
     unit_of_measurement: kWh
+    device_class: energy
 #  - platform: template
 #    name: "${switch_id} Apparent Power"
 #    unit_of_measurement: VA

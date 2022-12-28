@@ -2,7 +2,7 @@ esphome:
   name: esp-dd6bdc
   platform: ESP8266
   board: d1_mini
-  comment: Summer house solar panel monitor
+  comment: Summer house
 
 wifi:
   networks:
@@ -17,44 +17,98 @@ captive_portal:
 
 # Enable logging
 logger:
+  level: DEBUG
+  baud_rate: 0 # Disable log output on the UART as it conflicts with use by modbus
 
 # Enable Home Assistant API
 api:
 
 ota:
 
+web_server:
+  port: 80
+  
 time:
   - platform: homeassistant
     id: homeassistant_time
 
 
-i2c:
-  sda: D2
-  scl: D1
-  scan: True
+uart:
+  - id: uart1
+    baud_rate: 9600
+    debug:
+      direction: BOTH
+    parity: none
+    stop_bits: 1
+    tx_pin: GPIO1 # TX pin
+    rx_pin: GPIO3 # RX pin
 
+modbus:
+  id: modbus1
+  uart_id: uart1
+  flow_control_pin: D2 # GPIO4
+  
+modbus_controller:
+  - id: growatt
+    # the Modbus device addr
+    address: 0x1
+    modbus_id: modbus1
+    setup_priority: -10  
+
+
+
+# My model: Growatt MIC 750 TL-X single phase inverter
+# Protocol docs here? https://www.photovoltaicsolar.in/Growatt_Manual/MAX%20Series%20Modbus%20RTU%20Protocol.pdf
+# or here: https://raw.githubusercontent.com/nygma2004/growatt2mqtt/main/Growatt%20PV%20Inverter%20Modbus%20RS485%20RTU%20Protocol%20v120.pdf
 sensor:
-  - platform: ina219
-    address: 0x40
-    shunt_resistance: 0.1 ohm
-    current:
-      name: "Shed Solar Current"
-    power:
-      name: "Shed Solar Power"
-      id: my_power
-    bus_voltage:
-      name: "Shed Battery Voltage"
-    shunt_voltage:
-      name: "INA219 Shunt Voltage"
-      disabled_by_default: true
-    max_voltage: 16.0V
-    max_current: 3.2A
+  - platform: growatt_solar
     update_interval: 60s
+    protocol_version: RTU2 # RTU or RTU2?
 
-  - platform: total_daily_energy
-    name: "Shed Solar Total Daily Energy"
-    power_id: my_power
+    inverter_status:
+      name: "Growatt Status Code"
 
+    phase_a:
+      voltage:
+          name: "Growatt AC Voltage Phase"
+      current:
+          name: "Growatt AC Current Phase"
+      active_power:
+          name: "Growatt AC Power Phase"
+          state_class: measurement
+          
+    pv1:
+      voltage:
+          name: "Growatt PV Voltage"
+      current:
+          name: "Growatt PV Current"
+      active_power:
+          name: "Growatt PV Active Power"
+          
+#    active_power:
+#      name: "Growatt Grid Active Power"
+
+#    pv_active_power:
+#      name: "Growatt PV Active Power"
+
+    frequency:
+      name: "Growatt Frequency"
+      state_class: measurement
+
+    energy_production_day:
+      name: "Growatt Today's Generation"
+      device_class: energy
+      state_class: total_increasing
+
+    total_energy_production:
+      name: "Growatt Total Energy Production"
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+
+    inverter_module_temp:
+      name: "Growatt Inverter Module Temp"
+      
   - platform: dht
     model: AM2302
     pin: D6
