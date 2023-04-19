@@ -1,0 +1,124 @@
+esphome:
+  name: smartbulb1
+  platform: ESP8266
+  board: esp01_1m
+  comment: Bedside light
+  on_boot:
+    then:
+    - light.turn_on:
+        id: light1
+        transition_length: 1s
+        cold_white: 0%
+        warm_white: 20%
+        red: 100%
+        green: 0%
+        blue: 0%
+
+wifi:
+  ssid: "Ralph's WiFi"
+  password: "landrover59"
+  domain: .lan
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Smartbulb1 Fallback Hotspot"
+    password: "W4K2WX1LclK5"
+
+captive_portal:
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+output:
+  - platform: esp8266_pwm
+    id: output_red
+    pin: GPIO4
+  - platform: esp8266_pwm
+    id: output_green
+    pin: GPIO12
+  - platform: esp8266_pwm
+    id: output_blue
+    pin: GPIO14
+  - platform: esp8266_pwm
+    id: output_cold_white
+    pin: GPIO5
+  - platform: esp8266_pwm
+    id: output_warm_white
+    pin: GPIO13
+
+light:
+  - platform: rgbww
+    name: "Bedside light"
+    id: light1
+    red: output_red
+    green: output_green
+    blue: output_blue
+    cold_white: output_cold_white
+    warm_white: output_warm_white
+    cold_white_color_temperature: 6536 K
+    warm_white_color_temperature: 2000 K
+    effects:
+      # Use default parameters:
+      - strobe:
+      - flicker:
+      - lambda:
+          name: "Red Green Blue Fade"
+          update_interval: 4s
+          lambda: |-
+            static int state = 0;
+            auto call = id(light1).turn_on();                                                                           
+            call.set_transition_length(3000);                                                                      
+            if (state == 0) {                                                                             
+              call.set_rgb(1.0, 0.0, 0.0);
+            } else if (state == 1) {                                                                          
+              call.set_rgb(0.0, 1.0, 0.0);
+            } else if (state == 2) {                               
+              call.set_rgb(0.0, 0.0, 1.0);
+            } else {                                                       
+              call.set_rgb(1.0, 0.0, 0.0);
+            }                             
+            call.set_white(0.0);
+            call.perform();                                                                        
+            state += 1;                                                                                           
+            if (state == 3)
+              state = 0;
+      - lambda:
+          name: PulsingRed
+          update_interval: 2s
+          lambda: |-
+            static int state = 0;
+            auto call = id(light1).turn_on();                                                                           
+            call.set_transition_length(1500);                                                                      
+            if (state == 0) {                                                                             
+              call.set_rgb(1.0, 0.0, 0.0);
+              call.set_brightness(1.0);
+            } else if (state == 1) {                                                                          
+              call.set_rgb(1.0, 0.0, 0.0);
+              call.set_brightness(0.0);
+            }
+            call.set_white(0.0);
+            call.perform();                                                                        
+            state += 1;                                                                                           
+            if (state == 1)
+              state = 0;
+      - lambda:
+          name: "Random colour fade"
+          update_interval: 3s
+          lambda: |-
+            auto call = id(light1).turn_on();    
+            call.set_red_if_supported(random_float());
+            call.set_green_if_supported(random_float());
+            call.set_blue_if_supported(random_float());
+            call.set_white_if_supported(0.0);
+            call.set_transition_length_if_supported(2000);
+            call.set_publish(true);
+            call.set_save(false);
+            call.perform();
+
+# Ensure the light turns on by default if the physical switch is actuated.
+#    restore_mode: ALWAYS_ON # This overrides the on_boot automation and sets brightness to 100%, not what we want hence commented.
