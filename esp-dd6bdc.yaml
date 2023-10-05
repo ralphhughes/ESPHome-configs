@@ -34,7 +34,7 @@ time:
 
 
 uart:
-  - id: uart1
+  - id: my_uart1
     baud_rate: 9600
     debug:
       direction: BOTH
@@ -45,7 +45,7 @@ uart:
 
 modbus:
   id: modbus1
-  uart_id: uart1
+  uart_id: my_uart1
   flow_control_pin: D2 # GPIO4
   
 modbus_controller:
@@ -62,7 +62,7 @@ modbus_controller:
 # or here: https://raw.githubusercontent.com/nygma2004/growatt2mqtt/main/Growatt%20PV%20Inverter%20Modbus%20RS485%20RTU%20Protocol%20v120.pdf
 sensor:
   - platform: growatt_solar
-    update_interval: 60s
+    update_interval: 10s
     protocol_version: RTU2 # RTU or RTU2?
 
     inverter_status:
@@ -94,6 +94,12 @@ sensor:
     frequency:
       name: "Growatt Frequency"
       state_class: measurement
+      filters: # This filter is needed because the inverter often sends erroneous values on startup
+        - lambda: |-
+            if (x < 45.0 || x > 55.0) {
+              return {};
+            }
+            return x;
 
     energy_production_day:
       name: "Growatt Today's Generation"
@@ -108,6 +114,10 @@ sensor:
 
     inverter_module_temp:
       name: "Growatt Inverter Module Temp"
+      filters: # This filter is needed because the inverter often sends erroneous values on startup
+        - skip_initial: 3
+        - filter_out: 0.0
+      
       
   - platform: dht
     model: AM2302

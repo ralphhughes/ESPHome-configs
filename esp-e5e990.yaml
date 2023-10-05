@@ -3,6 +3,14 @@ esphome:
   platform: ESP8266
   board: d1_mini
   comment: Lounge
+  libraries:
+    - Wire
+    - SPI
+    - "https://github.com/wemos/LOLIN_HP303B_Library.git"
+
+external_components:
+  - source: github://shish/esphome-projects
+    components: [ hp303b ]
   
 wifi:
   networks:
@@ -11,8 +19,8 @@ wifi:
   - ssid: !secret wifi_ssid2
     password: !secret wifi_password2
   domain: .lan
-  power_save_mode: LIGHT
-  output_power: "10dB"
+  power_save_mode: HIGH
+  output_power: "8.5dB"
   ap: {}
 captive_portal:
 
@@ -43,30 +51,52 @@ i2c:
   scan: True
   
 sensor:
-  - platform: wifi_signal
-    name: "Lounge WiFi Signal"
-    update_interval: 60s
-  - platform: htu21d
+  - platform: sht3xd
+    address: 0x45
     temperature:
       name: "Lounge Temperature"
-      filters:
-        - offset: -1.0  # This is a guess, the sensor reads consistently higher than others at all times
+      id: temp1
     humidity:
       name: "Lounge Humidity"
+      id: humidity1
     update_interval: 60s
-
-binary_sensor:
-  - platform: gpio
-    pin: D3 # GPIO0
-    name: "Lounge PIR"
-    device_class: motion
+  - platform: htu21d
+    address: 0x40
+    temperature:
+      id: temp2
+    humidity:
+      name: "Lounge Humidity2"
+      id: humidity2
+    update_interval: 60s
+  - platform: hp303b # Make sure libraries for LOLIN_HP303B_Library.git are registered!
+    address: 0x77
+    temperature:
+      name: "Lounge Temperature"
+      id: temp3
+      device_class: TEMPERATURE
+      accuracy_decimals: 1
+    pressure:
+      id: pressure1
+      name: "Air Pressure"
+      device_class: ATMOSPHERIC_PRESSURE
+      unit_of_measurement: "mbar"
+      accuracy_decimals: 4
+    update_interval: 60s
+  - platform: absolute_humidity
+    name: Lounge Absolute Humidity
+    temperature: temp1
+    humidity: humidity1
+    
+#binary_sensor:
+#  - platform: gpio
+#    pin: D3 # GPIO0
+#    name: "Lounge PIR"
+#    device_class: motion
     
 
 text_sensor:
   - platform: wifi_info
     ip_address:
       name: "Lounge IP Address"
-    ssid:
-      name: "Lounge Connected SSID"
     bssid:
       name: "Lounge Connected BSSID"

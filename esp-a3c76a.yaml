@@ -1,8 +1,16 @@
 esphome:
   name: esp-a3c76a
-  comment: Car (temp)
+  comment: Dev
   platform: ESP8266
   board: d1_mini
+  includes:
+#    - custom_components/lolin_i2c_button.h
+    - custom_components/my_custom_sensor.h
+
+#external_components:
+#  - source:
+#      type: local
+#      path: custom_components/empty_i2c_sensor
 
 wifi:
   networks:
@@ -27,45 +35,68 @@ ota:
 time:
   - platform: homeassistant
 
+###############
+
+globals:
+  - id: last_calibration_pressure
+    type: float
+    restore_value: no
+    initial_value: '1013.25' # Avg atmospheric pressure
+
+button:
+  - platform: template
+    name: "Start"
+    id: "btn_start"
+    on_press:
+      then:
+        - logger.log: Setting calibration pressure
 
 
 sensor:
-  - platform: dht
-    pin: D5
-    model: AUTO_DETECT
-    temperature:
-      name: "Car Temperature"
-    humidity:
-      name: "Car Humidity"
-    update_interval: 60s
+- platform: custom
+  lambda: |-
+    auto my_sensor = new MyCustomSensor();
+    App.register_component(my_sensor);
+    return {my_sensor};
+  sensors:
+    name: "My Custom Sensor"
+#sensor:
+#  - platform: empty_i2c_sensor
+#    name: Empty I2C sensor
 
-
-  - platform: sht3xd 
-    temperature:
-      name: "Car Temperature2"
-    humidity:
-      name: "Car Humidity2"
-    address: 0x45  
-    update_interval: 60s
-
-  - platform: htu21d
-    temperature:
-      name: "Car Temperature3"
-    humidity:
-      name: "Car Humidity3"
-    update_interval: 60s
-
-  - platform: dht
-    pin: D6
-    model: DHT22_TYPE2
-    temperature:
-      name: "Car Temperature4"
-    humidity:
-      name: "Car Humidity4"
-    update_interval: 60s
+#  sensors:
+#    name: "My Custom Sensor"
+#  - platform: homeassistant
+#    name: "Outdoor Pressure"
+#    entity_id: sensor.illand85_pressure
+#    id: outdoor_pressure
 
 i2c:
   scan: true
   scl: D1
   sda: D2
 
+
+# 0x31 i2c button?
+
+
+
+
+font:
+  - file:
+      type: gfonts
+      family: Roboto
+      weight: 700
+    id: font1
+    size: 14
+    
+display:
+  - platform: ssd1306_i2c
+    model: "SSD1306 64x48"
+    reset_pin: D0
+    address: 0x3C
+    lambda: |-
+      it.printf(0, 0, id(font1), "%.3f", "Hello!");
+#      it.printf(0, 16, id(font1), "%.2fm", 
+#        8573.46f * log( id(last_calibration_pressure) / id(pressure1).state)
+#      );
