@@ -37,7 +37,23 @@ sensor:
     model: DHT22_TYPE2 # Didn't work: AUTO_DETECT, DHT11, DHT22
     temperature:
       name: "Hall Temperature"
+      id: temp1
     humidity:
       name: "Hall Humidity"
+      id: humidity1
     update_interval: 60s
 
+  - platform: absolute_humidity
+    name: Hall Absolute Humidity
+    temperature: temp1
+    humidity: humidity1
+
+  - platform: template
+    name: "Hall Dew Point"
+    unit_of_measurement: "°C"
+    lambda: |-
+      const float a = 17.27;   // const from https://planetcalc.com/248/
+      const float b = 237.7;   // const from https://planetcalc.com/248/
+      return ( (b * ( (id(temp1).state * a) / ( b + id(temp1).state) + logf (id(humidity1).state/100) ) )/( a - ( (id(temp1).state * a) / ( b + id(temp1).state) + logf (id(humidity1).state/100) ) ) ); 
+    accuracy_decimals: 1
+    

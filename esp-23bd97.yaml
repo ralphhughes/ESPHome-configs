@@ -33,17 +33,34 @@ sensor:
     pin: GPIO2
     temperature:
       name: "Kitchen Cupboard Temperature"
+      id: temp1
       filters:
         - sliding_window_moving_average:
             window_size: 15
             send_every: 10
     humidity:
       name: "Kitchen Cupboard Humidity"
+      id: humidity1
       filters:
         - sliding_window_moving_average:
             window_size: 8
             send_every: 10
     update_interval: 6s
+
+  - platform: absolute_humidity
+    name: Kitchen cupboard Absolute Humidity
+    temperature: temp1
+    humidity: humidity1
+
+  - platform: template
+    name: "Kitchen cupboard Dew Point"
+    unit_of_measurement: "°C"
+    lambda: |-
+      const float a = 17.27;   // const from https://planetcalc.com/248/
+      const float b = 237.7;   // const from https://planetcalc.com/248/
+      return ( (b * ( (id(temp1).state * a) / ( b + id(temp1).state) + logf (id(humidity1).state/100) ) )/( a - ( (id(temp1).state * a) / ( b + id(temp1).state) + logf (id(humidity1).state/100) ) ) ); 
+
+    
     
 text_sensor:
   - platform: wifi_info

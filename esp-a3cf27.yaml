@@ -41,10 +41,25 @@ sensor:
   - platform: sht3xd
     temperature:
       name: "Back bedroom temperature"
+      id: temp1
     humidity:
       name: "Back bedroom humidity"
+      id: humidity1
     address: 0x45
     update_interval: 60s
+
+  - platform: absolute_humidity
+    name: Back bedroom Absolute Humidity
+    temperature: temp1
+    humidity: humidity1
+
+  - platform: template
+    name: "Back bedroom Dew Point"
+    unit_of_measurement: "°C"
+    lambda: |-
+      const float a = 17.27;   // const from https://planetcalc.com/248/
+      const float b = 237.7;   // const from https://planetcalc.com/248/
+      return ( (b * ( (id(temp1).state * a) / ( b + id(temp1).state) + logf (id(humidity1).state/100) ) )/( a - ( (id(temp1).state * a) / ( b + id(temp1).state) + logf (id(humidity1).state/100) ) ) ); 
 
 binary_sensor:
   - platform: gpio
