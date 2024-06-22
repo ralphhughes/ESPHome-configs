@@ -10,7 +10,7 @@ wifi:
     password: !secret wifi_password
   - ssid: !secret wifi_ssid2
     password: !secret wifi_password2
-  domain: .lan
+  domain: .home
   ap:
     ssid: "Smartplug6 Fallback Hotspot"
     password: "cgenrVEfWivt"
@@ -24,6 +24,8 @@ logger:
 api:
 
 ota:
+  - platform: esphome
+    password: ""
 
 time:
   - platform: homeassistant

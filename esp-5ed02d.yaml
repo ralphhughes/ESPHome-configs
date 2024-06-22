@@ -10,7 +10,7 @@ wifi:
     password: !secret wifi_password
   - ssid: !secret wifi_ssid2
     password: !secret wifi_password2
-  domain: .lan
+  domain: .home
   power_save_mode: HIGH
   output_power: "12dB"
   # Enable fallback hotspot (captive portal) in case wifi connection fails
@@ -25,6 +25,8 @@ logger:
 api:
 
 ota:
+  - platform: esphome
+    password: ""
 
 i2c:
   scl: D1
