@@ -12,7 +12,7 @@ wifi:
     password: !secret wifi_password
   - ssid: !secret wifi_ssid2
     password: !secret wifi_password2
-  domain: .home
+  domain: .local
   ap: {} # This spawns an AP with the device name and mac address with no password.
 
   
@@ -26,75 +26,121 @@ api:
 
 web_server:
   port: 80
-  js_url: http://fitpc2i-2.home/esphome-custom/v1-custom.js
-  version: 1
+#  js_url: http://fitpc2i-2.home/esphome-custom/v1-custom.js
+#  version: 1
 
 ota:
   - platform: esphome
     password: ""
 
-#time:
-#  - platform: homeassistant
+# Time component to get the current time and day
+time:
+  - platform: homeassistant
+    id: homeassistant_time
 
-###############
+# Servos on D1 & D2
+servo:
+  - id: day_servo
+    output: pwm_output1
+    auto_detach_time: 1s
+    transition_length: 3s
+  - id: time_servo
+    output: pwm_output2
+    auto_detach_time: 1s
+    transition_length: 3s
 
-i2c:
-  sda: D2
-  scl: D1
-  scan: True
+# Outputs for the servos on D1 and D2
+output:
+  - platform: esp8266_pwm
+    id: pwm_output1
+    pin: D1
+    frequency: 50 Hz
+  - platform: esp8266_pwm
+    id: pwm_output2
+    pin: D2
+    frequency: 50 Hz
+
+# Number inputs for manual time and day testing
+number:
+  - platform: template
+    name: "Manual Time Input"
+    id: time_input
+    optimistic: true
+    min_value: 0.0
+    max_value: 23.99
+    step: 0.01
+  - platform: template
+    name: "Manual Day Input"
+    id: day_input
+    optimistic: true
+    min_value: 1
+    max_value: 7
+    step: 1
+
+# Switch to toggle between auto mode and manual mode
+switch:
+  - platform: template
+    name: "Manual Mode"
+    id: manual_mode
+    optimistic: true
+
+# Update servos based on the current time or manual inputs
+interval:
+  - interval: 10min
+    then:
+      - if:
+          condition:
+            switch.is_on: manual_mode
+          then:
+            # Manual mode: use input numbers
+            - lambda: |-
+                float manual_time = id(time_input).state;
+                float manual_day = id(day_input).state;
+
+                // From least squares regression (Excel linear trend line) calibration
+                float m = -0.0712;
+                float c = 0.9083;
+                
+                // Apply calibration using y = mx + c: Map [0, 23.99] -> [1, -1]
+                float calibrated_time_value = (m * manual_time) + c;
+
+                // Send calibrated value to time servo
+                id(time_servo).write(calibrated_time_value);
+
+                // Calculate position for day servo: Map [1, 7] -> [-1, 1]
+                float day_position = 1.0 - ((manual_day - 1) / 3.0);
+                id(day_servo).write(day_position);
+
+                ESP_LOGI("manual_mode", "Manual Time Input: %.2f, Time Servo Position: %.2f", manual_time, calibrated_time_value);
+                ESP_LOGI("manual_mode", "Manual Day Input: %.2f, Day Servo Position: %.2f", manual_day, day_position);
+          else:
+            # Auto mode: use actual time from Home Assistant
+            - lambda: |-
+                if (id(homeassistant_time).now().is_valid()) {
+                    float hour = id(homeassistant_time).now().hour;
+                    float minute = id(homeassistant_time).now().minute;
+
+                    // Calculate reverse position for time servo
+                    float time_position = hour + (minute / 60.0);
+                      
+                    // From least squares regression (Excel linear trend line) calibration
+                    float m = -0.0712;
+                    float c = 0.9083;
+                    
+                    // Apply calibration using y = mx + c
+                    float calibrated_value = (m * time_position) + c;
+
+                    // Send calibrated value to the servo
+                    id(time_servo).write(calibrated_value);
 
 
-globals:
-  - id: total_edge_count
-    type: int
-    restore_value: no
-    initial_value: "0"
+                    // Adjusting day_of_week where Sunday=1, Monday=2, ..., Saturday=7
+                    int day_of_week = id(homeassistant_time).now().day_of_week;
+                    
+                    // Calculate position for day servo: Map [1, 7] -> [-1, 1]
+                    float day_position = 1.0 - ((day_of_week - 1) / 3.0);
+                    id(day_servo).write(day_position);
 
-sensor:
-  - platform: qmc5883l
-    address: 0x0D
-    id: qmc5883l_mag
-    #field_strength_x:
-      
-      # name: "QMC5883L Field Strength X"
-      #internal: true  # Exclude from Home Assistant
-    #field_strength_y:
-      # name: "QMC5883L Field Strength Y"
-      #internal: true  # Exclude from Home Assistant
-    #field_strength_z:
-      # name: "QMC5883L Field Strength Z"
-      #internal: true  # Exclude from Home Assistant
-    range: 200uT
-    oversampling: 512x
-    update_interval: 300s
-#    internal: true
-
-
-
-binary_sensor:
-  - platform: gpio
-    pin: D5
-    name: "Edge Counter Binary Sensor"
-    internal: true
-    on_state:
-      then:
-        - component.update: qmc5883l_mag
-        - lambda: |-
-            id(total_edge_count) += 1;
-        - logger.log: 
-            format: "X: %u"
-            args: ['id(total_edge_count)']
-
-
-
-        
-#  - platform: vl53l0x
-#    id: vl53l0x_dist
-#    address: 0x29
-#    internal: true  # Exclude from Home Assistant
-#    filters:
-#      delta: 1000
-#    update_interval: never
-#    on_value:
-#      then:
-#        - component.update: qmc5883l_mag
+                    ESP_LOGI("auto_mode", "Hour: %.2f, Minute: %.2f, Time Servo Position: %.2f", hour, minute, time_position);
+                    ESP_LOGI("auto_mode", "Day of Week: %d, Day Servo Position: %.2f", day_of_week, day_position);
+                }

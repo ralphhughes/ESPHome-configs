@@ -1,0 +1,202 @@
+esphome:
+  name: esp-67dd80
+  comment: Mini-dehumidifier (NodeMCU ESP32-WROOM-32 with yellow pins)
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: mode_thaw
+
+esp32:
+  board: nodemcu-32s
+
+wifi:
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi_ssid2
+    password: !secret wifi_password2
+  use_address: esp-67dd80.local
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+  - platform: esphome
+    password: ""
+
+#web_server:
+#  port: 80
+  
+
+# Available pins 2024-10-25
+# Top right:
+# GND
+# GPIO19    AM2302
+# GPIO18    DS18B20
+# GPIO5
+# GPIO17    MOSFET
+
+# Top left:
+# 3V3, Enable, SP, SN, G35 (input only) , G34 (input only)
+
+# Bottom left:
+# V5 (Vin), CMD (do not use), SD3 (do not use), SD2 (do not use), G13
+
+
+i2c:
+  scl: GPIO22
+  sda: GPIO21
+  scan: true
+
+switch:
+  - platform: gpio
+    pin: GPIO17
+    restore_mode: ALWAYS_OFF
+    internal: true
+    id: peltier_mosfet
+
+output:
+  - platform: sigma_delta_output
+    id: peltier
+    update_interval: 400ms
+    min_power: 0.0
+    max_power: 1.0
+    turn_on_action:
+      then:
+        - switch.turn_on: peltier_mosfet
+    turn_off_action:
+      then:
+        - switch.turn_off: peltier_mosfet
+
+#external_components:
+#  - source: github://nrandell/dallasng
+#dallasng:
+#  - pin: GPIO18
+#    update_interval: 1.5s
+
+one_wire:
+  - platform: gpio
+    pin: GPIO18
+    
+sensor:
+  - platform: dallas_temp
+    address: 0x0700000088308628
+    name: Dehumidifier cold side temp
+    id: cold_temperature
+    update_interval: 6s
+
+  - platform: dht
+    pin: GPIO19
+    model: AM2302
+    temperature:
+      name: "3D Printer Temperature"
+      id: temp1
+      accuracy_decimals: 1.
+      filters:
+        - sliding_window_moving_average:
+            window_size: 12
+            send_every: 12
+            send_first_at: 1
+    humidity:
+      name: "3D Printer Humidity"
+      id: humidity1
+      accuracy_decimals: 1.
+      filters:
+        - sliding_window_moving_average:
+            window_size: 12
+            send_every: 12
+            send_first_at: 1
+    update_interval: 5s
+          
+  - platform: pid
+    name: Peltier PWM
+    type: COOL
+  - platform: pid
+    name: "[P]ID"
+    type: PROPORTIONAL
+  - platform: pid
+    name: "P[I]D"
+    type: INTEGRAL
+  - platform: pid
+    name: "PI[D]"
+    type: DERIVATIVE
+
+  - platform: absolute_humidity
+    name: "3D Printer Absolute Humidity"
+    temperature: temp1
+    humidity: humidity1
+
+  - platform: template
+    name: "3D Printer Dew Point"
+    id: printer_dew_point
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    lambda: |-
+      const float a = 17.27;   // const from https://planetcalc.com/248/
+      const float b = 237.7;   // const from https://planetcalc.com/248/
+      return ( (b * ( (id(temp1).state * a) / ( b + id(temp1).state) + logf (id(humidity1).state/100) ) )/( a - ( (id(temp1).state * a) / ( b + id(temp1).state) + logf (id(humidity1).state/100) ) ) ); 
+
+
+script:
+  - id: mode_normal
+    then:
+      - climate.control:
+          id: pid_climate
+          target_temperature: -1 °C
+      - delay: 4RE  0min
+      - script.execute: mode_thaw
+  - id: mode_thaw
+#    then:
+#      - climate.control: 
+#          id: pid_climate
+#          target_temperature: 4.0 °C
+    then:
+      - climate.control: 
+          id: pid_climate
+          target_temperature: !lambda |-
+            auto dew_point = id(printer_dew_point).state; // Replace with the ID of your dew point sensor
+            if (!isnan(dew_point)) {
+              return dew_point;
+            } else {
+              ESP_LOGW("mode_thaw", "Dew point is NaN, falling back to default target of 4.0°C");
+              return 4.0;
+            }      
+      - delay: 5min
+      - script.execute: mode_normal
+
+climate:
+  - platform: pid
+    id: pid_climate
+    name: Mini Dehumidifier Setpoint
+    sensor: cold_temperature
+    default_target_temperature: -0.5 °C
+    cool_output: peltier
+    visual:
+      min_temperature: -4 °C
+      max_temperature: 15 °C
+    control_parameters:
+      # defaults from original author
+#      kp: 0.3
+#      ki: 0.006
+#      kd: 1.7
+      # from pid autotune
+#      kp: 0.22224
+#      ki: 0.00741
+#      kd: 1.66678
+      
+      # no overshoot rules from pid autotune
+      kp: 0.07408
+      ki: 0.00247
+      kd: 1.38898
+      output_averaging_samples: 2
+      derivative_averaging_samples: 6
+    
+button:
+  - platform: template
+    name: Climate PID autotune
+    on_press:
+      - climate.pid.autotune: pid_climate

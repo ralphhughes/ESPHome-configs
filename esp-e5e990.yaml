@@ -19,7 +19,7 @@ wifi:
   - ssid: !secret wifi_ssid2
     password: !secret wifi_password2
   domain: .home
-  #power_save_mode: HIGH
+  power_save_mode: LIGHT
   output_power: "8.5dB"
   ap: {}
 captive_portal:
@@ -34,8 +34,8 @@ ota:
   - platform: esphome
     password: ""
 
-web_server:
-  port: 80
+#web_server:
+#  port: 80
   
 time:
   - platform: homeassistant
@@ -57,6 +57,7 @@ i2c:
   
 sensor:
   - platform: sht3xd
+    heater_enabled: false
     address: 0x45
     temperature:
       name: "Lounge Temperature"
@@ -103,7 +104,7 @@ sensor:
       const float a = 17.27;   // const from https://planetcalc.com/248/
       const float b = 237.7;   // const from https://planetcalc.com/248/
       return ( (b * ( (id(temp1).state * a) / ( b + id(temp1).state) + logf (id(humidity1).state/100) ) )/( a - ( (id(temp1).state * a) / ( b + id(temp1).state) + logf (id(humidity1).state/100) ) ) ); 
-    accuracy_decimals: 4
+    accuracy_decimals: 1
 
 #binary_sensor:
 #  - platform: gpio

@@ -1,0 +1,18 @@
+
+
+esp-a3c76a has two servo's
+-pins in use:
+--D1 pwm
+--D2 pwm
+
+
+
+esp-be1e8d is the current back bedroom sensor
+-pins in use: 
+--sda: D2
+--scl: D1
+--pin_a: D8
+--pin_b: D7
+--pin_c: D6
+--pin_d: D5
+

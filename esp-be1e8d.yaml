@@ -1,6 +1,12 @@
 esphome:
   name: esp-be1e8d
   comment: Back bedroom (clock)
+  on_boot:
+      priority: -200  # Ensure this runs after boot
+      then:
+        - stepper.set_target:
+            id: my_stepper
+            target: !lambda 'return id(stepper_position);'
   
 esp8266:
   board: d1_mini
@@ -34,6 +40,16 @@ i2c:
   scl: D1
   scan: True
   
+
+preferences:
+  flash_write_interval: 1min  # Adjust as needed to prevent frequent writes
+
+globals:
+  - id: stepper_position
+    type: int
+    restore_value: yes
+    initial_value: '0'
+
 time:
   - platform: homeassistant
     id: homeassistant_time
@@ -49,6 +65,9 @@ time:
           - stepper.set_target:
               id: my_stepper
               target: !lambda 'return 292;'
+          - globals.set:
+              id: stepper_position
+              value: '292'
       - seconds: 0
         minutes: 0
         hours: 0
@@ -57,6 +76,9 @@ time:
           - stepper.set_target:
               id: my_stepper
               target: !lambda 'return 585;'
+          - globals.set:
+              id: stepper_position
+              value: '585'
       - seconds: 0
         minutes: 0
         hours: 0
@@ -65,6 +87,9 @@ time:
           - stepper.set_target:
               id: my_stepper
               target: !lambda 'return 878;'
+          - globals.set:
+              id: stepper_position
+              value: '878'
       - seconds: 0
         minutes: 0
         hours: 0
@@ -73,6 +98,9 @@ time:
           - stepper.set_target:
               id: my_stepper
               target: !lambda 'return 1170;'
+          - globals.set:
+              id: stepper_position
+              value: '1170'
       - seconds: 0
         minutes: 0
         hours: 0
@@ -81,6 +109,9 @@ time:
           - stepper.set_target:
               id: my_stepper
               target: !lambda 'return 1463;'
+          - globals.set:
+              id: stepper_position
+              value: '1463'
       - seconds: 0
         minutes: 0
         hours: 0
@@ -89,6 +120,9 @@ time:
           - stepper.set_target:
               id: my_stepper
               target: !lambda 'return 1755;'
+          - globals.set:
+              id: stepper_position
+              value: '1755'
       - seconds: 0
         minutes: 0
         hours: 0
@@ -97,11 +131,9 @@ time:
           - stepper.set_target:
               id: my_stepper
               target: !lambda 'return 2048;'
-            
-#i2c:
-#  scan: true
-#  scl: D1
-#  sda: D2
+          - globals.set:
+              id: stepper_position
+              value: '2048'
 
 number:
   - platform: template
@@ -114,6 +146,9 @@ number:
         - stepper.set_target:
             id: my_stepper
             target: !lambda 'return x;'
+        - globals.set:
+            id: stepper_position
+            value: !lambda 'return x;'
   - platform: template
     name: Stepper Angle
     min_value: 0
@@ -124,6 +159,9 @@ number:
         - stepper.set_target:
             id: my_stepper
             target: !lambda 'return -x * 5.69f;'
+        - globals.set:
+            id: stepper_position
+            value: !lambda 'return -x * 5.69f;'
 
 select:
   - platform: template
@@ -138,13 +176,13 @@ select:
      - "Friday"
      - "Saturday"
      - "Sunday"
-    initial_option: "Off"
+    restore_value: true
     optimistic: true
     on_value:
       then:
         - logger.log:
             format: "Chosen option: %s (index %d)"
-            args: ["x.c_str()", "i"]    
+            args: ["x.c_str()", "i"]
         - if:
             condition:
               lambda: 'return id(manual_day).state == "Monday";'
@@ -152,6 +190,9 @@ select:
               - stepper.set_target:
                   id: my_stepper
                   target: !lambda 'return 292;'
+              - globals.set:
+                  id: stepper_position
+                  value: '292'
         - if:
             condition:
               lambda: 'return id(manual_day).state == "Tuesday";'
@@ -159,6 +200,9 @@ select:
               - stepper.set_target:
                   id: my_stepper
                   target: !lambda 'return 585;'
+              - globals.set:
+                  id: stepper_position
+                  value: '585'
         - if:
             condition:
               lambda: 'return id(manual_day).state == "Wednesday";'
@@ -166,6 +210,9 @@ select:
               - stepper.set_target:
                   id: my_stepper
                   target: !lambda 'return 878;'
+              - globals.set:
+                  id: stepper_position
+                  value: '878'
         - if:
             condition:
               lambda: 'return id(manual_day).state == "Thursday";'
@@ -173,6 +220,9 @@ select:
               - stepper.set_target:
                   id: my_stepper
                   target: !lambda 'return 1170;'
+              - globals.set:
+                  id: stepper_position
+                  value: '1170'
         - if:
             condition:
               lambda: 'return id(manual_day).state == "Friday";'
@@ -180,6 +230,9 @@ select:
               - stepper.set_target:
                   id: my_stepper
                   target: !lambda 'return 1463;'
+              - globals.set:
+                  id: stepper_position
+                  value: '1463'
         - if:
             condition:
               lambda: 'return id(manual_day).state == "Saturday";'
@@ -187,6 +240,9 @@ select:
               - stepper.set_target:
                   id: my_stepper
                   target: !lambda 'return 1755;'
+              - globals.set:
+                  id: stepper_position
+                  value: '1755'
         - if:
             condition:
               lambda: 'return id(manual_day).state == "Sunday";'
@@ -194,6 +250,9 @@ select:
               - stepper.set_target:
                   id: my_stepper
                   target: !lambda 'return 2048;'
+              - globals.set:
+                  id: stepper_position
+                  value: '2048'
 
 stepper:
   - platform: uln2003
@@ -204,8 +263,6 @@ stepper:
     pin_d: D5
     sleep_when_done: true
     max_speed: 250 steps/s
-
-    # Optional:
     acceleration: inf
     deceleration: inf
     

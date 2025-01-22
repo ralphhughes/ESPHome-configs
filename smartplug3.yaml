@@ -1,3 +1,5 @@
+# Hardware for this plug died June 2024
+
 esphome:
   name: smartplug3
   comment: 2NICE UP111 with power monitoring
